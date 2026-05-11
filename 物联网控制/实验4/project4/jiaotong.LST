@@ -1,0 +1,134 @@
+C51 COMPILER V8.08   JIAOTONG                                                              04/27/2026 10:57:35 PAGE 1   
+
+
+C51 COMPILER V8.08, COMPILATION OF MODULE JIAOTONG
+OBJECT MODULE PLACED IN jiaotong.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE jiaotong.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          #include <reg51.h>
+   2          
+   3          // 数码管位选
+   4          sbit LSA = P2^2;
+   5          sbit LSB = P2^3;
+   6          sbit LSC = P2^4;
+   7          
+   8          // 交通灯
+   9          sbit EW_GREEN = P1^0;   // 东西绿灯
+  10          sbit EW_YELLOW = P1^1;  // 东西黄灯
+  11          sbit EW_RED = P1^2;     // 东西红灯
+  12          sbit SN_GREEN = P1^3;   // 南北绿灯
+  13          sbit SN_YELLOW = P1^4;  // 南北黄灯
+  14          sbit SN_RED = P1^5;     // 南北红灯
+  15          
+  16          // 段码表
+  17          unsigned char code seg[] = {0x3F,0x06,0x5B,0x4F,0x66,0x6D,0x7D,0x07,0x7F,0x6F};
+  18          
+  19          unsigned int second = 30;   // 倒计时
+  20          unsigned char state = 0;    // 0:东西绿 1:东西黄 2:南北绿 3:南北黄
+  21          unsigned int cnt = 0;       // 1ms计数
+  22          
+  23          // 定时器初始化
+  24          void Timer0_Init(void)
+  25          {
+  26   1          TMOD |= 0x01;
+  27   1          TH0 = 0xFC;
+  28   1          TL0 = 0x18;
+  29   1          EA = 1;
+  30   1          ET0 = 1;
+  31   1          TR0 = 1;
+  32   1      }
+  33          
+  34          // 延时
+  35          void delay(unsigned int ms)
+  36          {
+  37   1          unsigned int i,j;
+  38   1          for(i=0;i<ms;i++)
+  39   1              for(j=0;j<120;j++);
+  40   1      }
+  41          
+  42          // 显示数字（两位）
+  43          void Display(unsigned int num)
+  44          {
+  45   1          unsigned char shi, ge;
+  46   1          shi = num / 10;
+  47   1          ge = num % 10;
+  48   1          
+  49   1          // 十位
+  50   1          LSA=0; LSB=0; LSC=0;
+  51   1          P0 = seg[shi];
+  52   1          delay(2);
+  53   1          
+  54   1          // 个位
+  55   1          LSA=1; LSB=0; LSC=0;
+C51 COMPILER V8.08   JIAOTONG                                                              04/27/2026 10:57:35 PAGE 2   
+
+  56   1          P0 = seg[ge];
+  57   1          delay(2);
+  58   1      }
+  59          
+  60          // 设置灯状态
+  61          void SetLight(void)
+  62          {
+  63   1          // 全部熄灭
+  64   1          EW_GREEN=EW_YELLOW=EW_RED=0;
+  65   1          SN_GREEN=SN_YELLOW=SN_RED=0;
+  66   1          
+  67   1          switch(state)
+  68   1          {
+  69   2              case 0: EW_GREEN=1; SN_RED=1; break;   // 东西绿
+  70   2              case 1: EW_YELLOW=1; SN_RED=1; break;  // 东西黄
+  71   2              case 2: SN_GREEN=1; EW_RED=1; break;   // 南北绿
+  72   2              case 3: SN_YELLOW=1; EW_RED=1; break;  // 南北黄
+  73   2          }
+  74   1      }
+  75          
+  76          // 主函数
+  77          void main(void)
+  78          {
+  79   1          Timer0_Init();
+  80   1          SetLight();
+  81   1          
+  82   1          while(1)
+  83   1          {
+  84   2              Display(second);
+  85   2              
+  86   2              switch(state)
+  87   2              {
+  88   3                  case 0: if(second==0){second=5; state=1; SetLight();} break;
+  89   3                  case 1: if(second==0){second=30; state=2; SetLight();} break;
+  90   3                  case 2: if(second==0){second=5; state=3; SetLight();} break;
+  91   3                  case 3: if(second==0){second=30; state=0; SetLight();} break;
+  92   3              }
+  93   2          }
+  94   1      }
+  95          
+  96          // 定时器中断
+  97          void Timer0_ISR(void) interrupt 1
+  98          {
+  99   1          TH0=0xFC;
+ 100   1          TL0=0x18;
+ 101   1          cnt++;
+ 102   1          if(cnt>=1000)
+ 103   1          {
+ 104   2              cnt=0;
+ 105   2              if(second>0) second--;
+ 106   2          }
+ 107   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    312    ----
+   CONSTANT SIZE    =     10    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      5       1
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+C51 COMPILER V8.08   JIAOTONG                                                              04/27/2026 10:57:35 PAGE 3   
+
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,233 @@
+C51 COMPILER V8.08   TEXT3                                                                 04/27/2026 11:22:35 PAGE 1   
+
+
+C51 COMPILER V8.08, COMPILATION OF MODULE TEXT3
+OBJECT MODULE PLACED IN Text3.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE Text3.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          #include <reg51.h>
+   2          
+   3          // 数码管位选
+   4          sbit LSA = P2^2;
+   5          sbit LSB = P2^3;
+   6          sbit LSC = P2^4;
+   7          
+   8          // 交通灯
+   9          sbit EW_GREEN = P1^0;   // 东西绿灯
+  10          sbit EW_YELLOW = P1^1;  // 东西黄灯
+  11          sbit EW_RED = P1^2;     // 东西红灯
+  12          sbit SN_GREEN = P1^3;   // 南北绿灯
+  13          sbit SN_YELLOW = P1^4;  // 南北黄灯
+  14          sbit SN_RED = P1^5;     // 南北红灯
+  15          
+  16          // 独立按键
+  17          sbit KEY_SET = P3^1;    // 设置键 K1
+  18          sbit KEY_ADD = P3^2;    // 加键 K2
+  19          sbit KEY_SUB = P3^3;    // 减键 K3
+  20          
+  21          // 段码表
+  22          unsigned char code seg[] = {0x3F,0x06,0x5B,0x4F,0x66,0x6D,0x7D,0x07,0x7F,0x6F};
+  23          
+  24          // 时间参数
+  25          unsigned int EW_GREEN_TIME = 10;   // 东西绿灯时间
+  26          unsigned int SN_GREEN_TIME = 10;   // 南北绿灯时间
+  27          unsigned int YELLOW_TIME   = 3;    // 黄灯时间
+  28          
+  29          unsigned int second = 10;          // 当前倒计时
+  30          unsigned char state = 0;           // 0:东西绿 1:东西黄 2:南北绿 3:南北黄
+  31          unsigned int cnt = 0;              // 1ms计数
+  32          
+  33          bit SET_MODE = 0;                 // 0:运行模式 1:设置模式
+  34          unsigned char set_item = 0;        // 设置项 0:东西绿 1:南北绿 2:黄灯
+  35          
+  36          // 函数声明
+  37          void Timer0_Init(void);
+  38          void delay(unsigned int ms);
+  39          void Display(unsigned int num);
+  40          void SetLight(void);
+  41          void KeyScan(void);
+  42          
+  43          // 定时器初始化
+  44          void Timer0_Init(void)
+  45          {
+  46   1          TMOD |= 0x01;
+  47   1          TH0 = 0xFC;
+  48   1          TL0 = 0x18;
+  49   1          EA = 1;
+  50   1          ET0 = 1;
+  51   1          TR0 = 1;
+  52   1      }
+  53          
+  54          // 延时
+  55          void delay(unsigned int ms)
+C51 COMPILER V8.08   TEXT3                                                                 04/27/2026 11:22:35 PAGE 2   
+
+  56          {
+  57   1          unsigned int i,j;
+  58   1          for(i=0;i<ms;i++)
+  59   1              for(j=0;j<120;j++);
+  60   1      }
+  61          
+  62          // 显示数字（两位）
+  63          void Display(unsigned int num)
+  64          {
+  65   1          unsigned char shi, ge;
+  66   1          shi = num / 10;
+  67   1          ge = num % 10;
+  68   1          
+  69   1          // 十位
+  70   1          LSA=0; LSB=0; LSC=0;
+  71   1          P0 = seg[shi];
+  72   1          delay(2);
+  73   1          
+  74   1          // 个位
+  75   1          LSA=1; LSB=0; LSC=0;
+  76   1          P0 = seg[ge];
+  77   1          delay(2);
+  78   1      }
+  79          
+  80          // 设置灯状态
+  81          void SetLight(void)
+  82          {
+  83   1          EW_GREEN=EW_YELLOW=EW_RED=0;
+  84   1          SN_GREEN=SN_YELLOW=SN_RED=0;
+  85   1          
+  86   1          switch(state)
+  87   1          {
+  88   2              case 0: EW_GREEN=1; SN_RED=1; break;   // 东西绿
+  89   2              case 1: EW_YELLOW=1; SN_RED=1; break;  // 东西黄
+  90   2              case 2: SN_GREEN=1; EW_RED=1; break;   // 南北绿
+  91   2              case 3: SN_YELLOW=1; EW_RED=1; break;  // 南北黄
+  92   2          }
+  93   1      }
+  94          
+  95          // 按键扫描
+  96          void KeyScan(void)
+  97          {
+  98   1          if(KEY_SET == 0)        // 设置键
+  99   1          {
+ 100   2              delay(10);
+ 101   2              if(KEY_SET == 0)
+ 102   2              {
+ 103   3                  SET_MODE = !SET_MODE;
+ 104   3                  if(SET_MODE == 1)
+ 105   3                  {
+ 106   4                      set_item = 0;          // 进入设置，从东西绿灯开始
+ 107   4                  }
+ 108   3                  else
+ 109   3                  {
+ 110   4                      // 退出设置，恢复正常倒计时
+ 111   4                      second = EW_GREEN_TIME;
+ 112   4                      state = 0;
+ 113   4                      SetLight();
+ 114   4                  }
+ 115   3                  while(KEY_SET == 0);
+ 116   3              }
+ 117   2          }
+C51 COMPILER V8.08   TEXT3                                                                 04/27/2026 11:22:35 PAGE 3   
+
+ 118   1      
+ 119   1          if(SET_MODE)           // 设置模式下
+ 120   1          {
+ 121   2              if(KEY_ADD == 0)   // 加键
+ 122   2              {
+ 123   3                  delay(10);
+ 124   3                  if(KEY_ADD == 0)
+ 125   3                  {
+ 126   4                      switch(set_item)
+ 127   4                      {
+ 128   5                          case 0: if(EW_GREEN_TIME < 99) EW_GREEN_TIME++; break;
+ 129   5                          case 1: if(SN_GREEN_TIME < 99) SN_GREEN_TIME++; break;
+ 130   5                          case 2: if(YELLOW_TIME < 99) YELLOW_TIME++; break;
+ 131   5                      }
+ 132   4                      while(KEY_ADD == 0);
+ 133   4                  }
+ 134   3              }
+ 135   2      
+ 136   2              if(KEY_SUB == 0)   // 减键
+ 137   2              {
+ 138   3                  delay(10);
+ 139   3                  if(KEY_SUB == 0)
+ 140   3                  {
+ 141   4                      switch(set_item)
+ 142   4                      {
+ 143   5                          case 0: if(EW_GREEN_TIME > 1) EW_GREEN_TIME--; break;
+ 144   5                          case 1: if(SN_GREEN_TIME > 1) SN_GREEN_TIME--; break;
+ 145   5                          case 2: if(YELLOW_TIME > 1) YELLOW_TIME--; break;
+ 146   5                      }
+ 147   4                      while(KEY_SUB == 0);
+ 148   4                  }
+ 149   3              }
+ 150   2      
+ 151   2              // 短按切换设置项（可选）
+ 152   2              // 如需自动切换，可在主循环中增加计时切换
+ 153   2          }
+ 154   1      }
+ 155          
+ 156          // 主函数
+ 157          void main(void)
+ 158          {
+ 159   1          Timer0_Init();
+ 160   1          SetLight();
+ 161   1          
+ 162   1          while(1)
+ 163   1          {
+ 164   2              KeyScan();
+ 165   2              
+ 166   2              if(SET_MODE)    // 设置模式
+ 167   2              {
+ 168   3                  switch(set_item)
+ 169   3                  {
+ 170   4                      case 0: Display(EW_GREEN_TIME); break;
+ 171   4                      case 1: Display(SN_GREEN_TIME); break;
+ 172   4                      case 2: Display(YELLOW_TIME); break;
+ 173   4                  }
+ 174   3                  
+ 175   3                  // 短按设置键切换设置项（可选）
+ 176   3                  // 此处可添加长按切换逻辑
+ 177   3              }
+ 178   2              else            // 运行模式
+ 179   2              {
+C51 COMPILER V8.08   TEXT3                                                                 04/27/2026 11:22:35 PAGE 4   
+
+ 180   3                  Display(second);
+ 181   3                  
+ 182   3                  switch(state)
+ 183   3                  {
+ 184   4                      case 0: if(second==0){second=YELLOW_TIME; state=1; SetLight();} break;
+ 185   4                      case 1: if(second==0){second=SN_GREEN_TIME; state=2; SetLight();} break;
+ 186   4                      case 2: if(second==0){second=YELLOW_TIME; state=3; SetLight();} break;
+ 187   4                      case 3: if(second==0){second=EW_GREEN_TIME; state=0; SetLight();} break;
+ 188   4                  }
+ 189   3              }
+ 190   2          }
+ 191   1      }
+ 192          
+ 193          // 定时器中断
+ 194          void Timer0_ISR(void) interrupt 1
+ 195          {
+ 196   1          TH0=0xFC;
+ 197   1          TL0=0x18;
+ 198   1          cnt++;
+ 199   1          if(cnt>=1000)
+ 200   1          {
+ 201   2              cnt=0;
+ 202   2              if(!SET_MODE && second>0) second--;
+ 203   2          }
+ 204   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    574    ----
+   CONSTANT SIZE    =     10    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     12       1
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      1    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
